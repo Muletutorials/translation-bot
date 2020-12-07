@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:slack="http://www.mulesoft.org/schema/mule/slack"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/slack http://www.mulesoft.org/schema/mule/slack/current/mule-slack.xsd">
+	<flow name="translate-msg-flow">
+		<http:listener doc:name="Listener"
+			config-ref="HTTP_Listener_config" path="/translate" />
+		<set-variable
+			value='#[output application/json --- (payload.text splitBy "|")[0]]'
+			doc:name="toLang" variableName="toLang" />
+		<set-payload
+			value='#[%dw 2.0 output application/json --- [text: ((payload.text splitBy "|")[1]) replace "+" with " "]]'
+			doc:name="set Message" />
+		<http:request method="POST" doc:name="Request"
+			config-ref="Cognitive_Request_configuration" path="/translate">
+			<http:headers><![CDATA[#[{
+	"Ocp-Apim-Subscription-Key": p("api.secret"),
+	"Ocp-Apim-Subscription-Region": p("api.region")
+}]]]></http:headers>
+			<http:query-params><![CDATA[#[{
+	"api-version": "3.0",
+	"to": vars.toLang
+}]]]></http:query-params>
+		</http:request>
+		<set-payload value="#[payload.translations[0].text[0]]"
+			doc:name="Set Payload" />
+		<logger level="INFO" doc:name="INFO: Translation Complete"
+			message="Translation Complete" />
+	</flow>
+</mule>
